@@ -299,7 +299,7 @@ async function createPoll(channel, fightCard) {
     channel.send({ content: 'Click the button below to view your picks:', components: [viewMyPicksButton] });
 
     // Add the rules message after the "View My Picks" button
-    const rulesMessage = '**__Rules__**\n**Leaderboard goes by number of fight winners picked correctly**\n**Tiebreaker is determined by amount of \'method of victories\' picked correctly**\n**Make sure to click \'View My Picks\' button to ensure you made all Fighter and Method selections**';
+    const rulesMessage = '**__Rules__**\n**- Leaderboard goes by number of fight winners picked correctly**\n**- Tiebreaker is determined by amount of \'method of victories\' picked correctly**\n**- Make sure to click \'View My Picks\' button to confirm you made all Fighter and Method selections**';
     channel.send(rulesMessage);
 
           // Handle the "View My Picks" button interaction
