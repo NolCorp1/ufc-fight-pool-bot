@@ -59,7 +59,7 @@ app.listen(port, () => {
 });
 
 // URL of the Wikipedia page with the table you want to scrape
-const url = 'https://en.wikipedia.org/wiki/UFC_298';
+const url = 'https://en.wikipedia.org/wiki/UFC_Fight_Night:_Moreno_vs._Royval_2';
 
 // Function to scrape and process the UFC fight card data
 async function scrapeUFCCard() {
@@ -298,6 +298,10 @@ async function createPoll(channel, fightCard) {
     );
     channel.send({ content: 'Click the button below to view your picks:', components: [viewMyPicksButton] });
 
+    // Add the rules message after the "View My Picks" button
+    const rulesMessage = '**__Rules__**\n**Leaderboard goes by number of fight winners picked correctly**\n**Tiebreaker is determined by amount of \'method of victories\' picked correctly**\n**Make sure to click \'View My Picks\' button to ensure you made all Fighter and Method selections**';
+    channel.send(rulesMessage);
+
           // Handle the "View My Picks" button interaction
           client.on('interactionCreate', async (interaction) => {
             if (interaction.isButton() && interaction.customId === 'viewMyPicks') {
@@ -532,7 +536,7 @@ function calculateUserRecords(completedFights, userSelections) {
 
   // Create a formatted result array
   const formattedUserRecords = userRecordsArray.map((record) => {
-    return `${record.user.displayName}: Wins: ${record.wins}`;
+    return `${record.user.displayName}: ${record.wins}`;
   });
 
   return formattedUserRecords;
