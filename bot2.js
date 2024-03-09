@@ -13,7 +13,7 @@ const urlShortener = require('node-url-shortener');
 const { token } = require("./config.json");
 const { prefix } = require("./config.json");
 const app = express();
-
+const port = process.env.PORT || 3000;
 const googleCseId = '74d3744699a0a4ed8';
 const googleApiKey = 'AIzaSyDkeE0zpcPt-oGrfhOq3Km1LLtcMTqE4GM';
 
@@ -50,8 +50,16 @@ client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
+app.get('/', (req, res) => {
+  res.send('Bot is running');
+});
+
+app.listen(port, () => {
+  console.log(`Bot web server running on port ${port}`);
+});
+
 // URL of the Wikipedia page with the table you want to scrape
-const url = 'https://en.wikipedia.org/wiki/UFC_298';
+const url = 'https://en.wikipedia.org/wiki/UFC_Fight_Night:_Moreno_vs._Royval_2';
 
 // Function to scrape and process the UFC fight card data
 async function scrapeUFCCard() {
@@ -290,6 +298,10 @@ async function createPoll(channel, fightCard) {
     );
     channel.send({ content: 'Click the button below to view your picks:', components: [viewMyPicksButton] });
 
+    // Add the rules message after the "View My Picks" button
+    const rulesMessage = '**__Rules__**\n**- Leaderboard goes by number of fight winners picked correctly**\n**- Tiebreaker is determined by amount of \'method of victories\' picked correctly**\n**- Make sure to click \'View My Picks\' button to confirm you made all Fighter and Method selections**';
+    channel.send(rulesMessage);
+
           // Handle the "View My Picks" button interaction
           client.on('interactionCreate', async (interaction) => {
             if (interaction.isButton() && interaction.customId === 'viewMyPicks') {
@@ -380,7 +392,7 @@ client.on('messageCreate', async (message) => {
 
 // Command to show all users' selections for all fight polls
 client.on('messageCreate', (message) => {
-  if (message.content.startsWith(`${prefix}showpicks`)&& message.member.permissions.has('ADMINISTRATOR')) {
+  if (message.content.startsWith(`${prefix}showselections`)&& message.member.permissions.has('ADMINISTRATOR')) {
     // Create an array to store all the fightids in order
     const allFightIds = [...new Set(fightCard.map((fight) => `${fight.fighter1} vs ${fight.fighter2}`))];
 
@@ -420,30 +432,128 @@ client.on('messageCreate', (message) => {
   }
 });
 
-// Command to show the number of picks made by each user
-client.on('messageCreate', (message) => {
-  if (message.content.startsWith(`${prefix}whopicked`)) {
-    const userIds = Object.keys(userSelections);
+// Command to update and calculate user records
+client.on('messageCreate', async (message) => {
+  if (message.content.startsWith(`${prefix}update`)) {
+    try {
+      // Scrape the Wikipedia page to get the completed fight results
+      const completedFights = await scrapeCompletedFights();
 
-    if (userIds.length === 0) {
-      message.channel.send('No picks have been made yet.');
-    } else {
-      let picksCountMessage = 'Number of picks made by each user:\n';
+      if (completedFights.length === 0) {
+        message.channel.send('No completed fights found.');
+      } else {
+        // Calculate user records based on the completed fights
+        const userRecords = calculateUserRecords(completedFights, userSelections);
 
-      userIds.forEach((userId) => {
-        const user = message.guild.members.cache.get(userId);
-
-        if (user) {
-          const userPicksCount = Object.values(userSelections[userId]).filter((selection) => selection.winner && selection.method).length;
-          picksCountMessage += `${user.displayName}: ${userPicksCount} picks\n`;
-        }
-      });
-
-      message.channel.send(picksCountMessage);
+        // Output the completed fight results and user records
+        const resultsMessage = `__**Results:**__\n${completedFights.join('\n')}\n\n__**Leaderboard:**__\n${userRecords.join('\n')}`;
+        message.channel.send(resultsMessage);
+      }
+    } catch (error) {
+      console.error('Error updating and calculating user records:', error);
     }
   }
 });
 
+// Function to scrape completed fight results from the Wikipedia page
+async function scrapeCompletedFights() {
+  try {
+    const response = await axios.get(url); // Use the same URL as before
+    const $ = cheerio.load(response.data);
+
+    // Locate the specific table containing the fight results
+    const table = $('table.toccolours').first();
+
+    const completedFights = [];
+
+    // Process the table rows to extract completed fight results
+    table.find('tr').each((index, row) => {
+      const columns = $(row).find('td');
+      const vsText = $(columns[2]).text().trim();
+
+      // Check if the fight is completed (column 2 contains "def.")
+      if (vsText === 'def.') {
+        const winner = $(columns[1]).text().trim();
+        const loser = $(columns[3]).text().trim();
+        const method = $(columns[4]).text().trim();
+        completedFights.push(`**${winner}** def. ${loser} by ${method}`);
+      }
+    });
+
+    return completedFights;
+  } catch (error) {
+    console.error('Error:', error);
+    return [];
+  }
+}
+
+// Function to calculate user records based on completed fights
+function calculateUserRecords(completedFights, userSelections) {
+  const userRecords = {};
+
+  // Iterate through completed fights
+  completedFights.forEach((completedFight) => {
+    const { winner } = extractWinnerAndLoser(completedFight);
+
+    if (!winner) {
+      return; // Skip incomplete fight results
+    }
+
+    // Iterate through user selections for this specific fight
+    for (const fightId in userSelections) {
+      const userIds = Object.keys(userSelections[fightId]);
+
+      // Check if the winner's name matches any user's selection for this specific fight
+      userIds.forEach((userId) => {
+        const userSelection = userSelections[fightId][userId].winner;
+
+        if (userSelection === winner) {
+          // Update user's wins
+          userRecords[userId] = userRecords[userId] || { wins: 0, losses: 0 };
+          userRecords[userId].wins++;
+        } else {
+          // Update user's losses
+          //userRecords[userId] = userRecords[userId] || { wins: 0, losses: 0 };
+          //userRecords[userId].losses++;
+        }
+      });
+    }
+  });
+
+  // Format user records as an array of objects
+  const userRecordsArray = [];
+  for (const userId in userRecords) {
+    const { wins, losses } = userRecords[userId];
+    const user = client.users.cache.get(userId);
+
+    if (user) {
+      userRecordsArray.push({ user, wins });
+    }
+  }
+
+  // Sort user records by wins in descending order
+  userRecordsArray.sort((a, b) => b.wins - a.wins);
+
+  // Create a formatted result array
+  const formattedUserRecords = userRecordsArray.map((record) => {
+    return `${record.user.displayName}: ${record.wins}`;
+  });
+
+  return formattedUserRecords;
+}
+
+
+
+// Function to extract winner and loser from a completed fight string
+function extractWinnerAndLoser(completedFight) {
+  const match = completedFight.match(/\*\*(.*?)\*\* def\. (.*?) by (.*)$/);
+  if (match && match.length === 4) {
+    const winner = match[1];
+    const loser = match[2];
+    return { winner, loser };
+  }
+  return null;
+}
 
 
 
