@@ -59,7 +59,7 @@ app.listen(port, () => {
 });
 
 // URL of the Wikipedia page with the table you want to scrape
-const url = 'https://en.wikipedia.org/wiki/UFC_Fight_Night:_Allen_vs._Curtis_2';
+const url = 'https://en.wikipedia.org/wiki/UFC_300';
 
 // Function to scrape and process the UFC fight card data
 async function scrapeUFCCard() {
