@@ -332,7 +332,7 @@ async function createPoll(channel, fightCard) {
                 const selectionList = orderedSelections.join('\n');
     
                 // Create the message content with the number of picks made and the total picks
-                const messageContent = `You have made ${winnersSelected} out of ${fightCard.length} Fight Winner picks.\nYou have made ${methodsSelected} out of ${fightCard.length} Winning Method picks.\n\n${selectionList}`;
+                const messageContent = `You have selected **${winnersSelected}** out of **${fightCard.length}** Fight Winners.\nYou have selected **${methodsSelected}** out of **${fightCard.length}** Winning Method.\n\n${selectionList}`;
     
                 // Send an ephemeral message with the user's selections and pick count
                 if (winnersSelected > 0 || methodsSelected > 0) { // This checks if the user made any selections
@@ -355,7 +355,49 @@ async function createPoll(channel, fightCard) {
     }
 
 
+// Command to show each user that has made selections and how many fight winner and method selections they have made
+client.on('messageCreate', (message) => {
+  if (message.content.startsWith(`${prefix}whosin`)) {
+    let whosinMessage = '**Users who have made selections:**\n';
     
+    // Create an object to store user selection counts
+    const userSelectionCounts = {};
+
+    for (const fightId in userSelections) {
+      for (const userId in userSelections[fightId]) {
+        const userSelection = userSelections[fightId][userId];
+
+        if (!userSelectionCounts[userId]) {
+          userSelectionCounts[userId] = { winners: 0, methods: 0 };
+        }
+
+        if (userSelection.winner) {
+          userSelectionCounts[userId].winners++;
+        }
+        
+        if (userSelection.method) {
+          userSelectionCounts[userId].methods++;
+        }
+      }
+    }
+
+    // Format the user selection counts for output
+    for (const userId in userSelectionCounts) {
+      const { winners, methods } = userSelectionCounts[userId];
+      const user = message.guild.members.cache.get(userId);
+      
+      if (user) {
+        whosinMessage += `${user.displayName}: ${winners} Fight Winner picks, ${methods} Method picks\n`;
+      }
+    }
+
+    if (whosinMessage === '**Users who have made selections:**\n') {
+      whosinMessage += 'No selections made yet.';
+    }
+
+    message.channel.send(whosinMessage);
+  }
+});    
 
 
 
