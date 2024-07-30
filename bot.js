@@ -332,7 +332,7 @@ async function createPoll(channel, fightCard) {
                 const selectionList = orderedSelections.join('\n');
     
                 // Create the message content with the number of picks made and the total picks
-                const messageContent = `You have selected **${winnersSelected}** out of **${fightCard.length}** Fight Winners.\nYou have selected **${methodsSelected}** out of **${fightCard.length}** Winning Method.\n\n${selectionList}`;
+                const messageContent = `**${winnersSelected}** out of **${fightCard.length}** Fight Winners selected.\n**${methodsSelected}** out of **${fightCard.length}** Winning Methods selected.\n\n${selectionList}`;
     
                 // Send an ephemeral message with the user's selections and pick count
                 if (winnersSelected > 0 || methodsSelected > 0) { // This checks if the user made any selections
@@ -358,7 +358,7 @@ async function createPoll(channel, fightCard) {
 // Command to show each user that has made selections and how many fight winner and method selections they have made
 client.on('messageCreate', (message) => {
   if (message.content.startsWith(`${prefix}whosin`)) {
-    let whosinMessage = '**Users who have made selections:**\n';
+    let whosinMessage = '**Fellas who have made selections:**\n';
     
     // Create an object to store user selection counts
     const userSelectionCounts = {};
@@ -391,7 +391,7 @@ client.on('messageCreate', (message) => {
       }
     }
 
-    if (whosinMessage === '**Users who have made selections:**\n') {
+    if (whosinMessage === '**Fellas who have made selections:**\n') {
       whosinMessage += 'No selections made yet.';
     }
 
