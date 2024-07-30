@@ -307,7 +307,6 @@ async function createPoll(channel, fightCard) {
             if (interaction.isButton() && interaction.customId === 'viewMyPicks') {
                 const userId = interaction.user.id;
                 const selectedFighters = userSelections;
-                const numberOfSelections = Object.keys(selectedFighters).length;
     
                 // Create an array to hold the selections in the order of the fight card's fight IDs
                 const orderedSelections = fightCard.map((fightInfo) => {
@@ -327,16 +326,16 @@ async function createPoll(channel, fightCard) {
     
                 // Count the number of fight winners and methods selected
                 const winnersSelected = orderedSelections.filter(selection => selection !== 'No Selection').length;
-                const methodsSelected = orderedSelections.filter(selection => selection.includes(' - ')).length;
+                const methodsSelected = orderedSelections.filter(selection => selection.includes(' - ') && !selection.includes('No Method')).length;
 
                 // Create a concise list of selections
                 const selectionList = orderedSelections.join('\n');
     
                 // Create the message content with the number of picks made and the total picks
-                const messageContent = `You have made ${numberOfSelections} out of ${fightCard.length} picks.\nWinners selected: ${winnersSelected}\nMethods selected: ${methodsSelected}\n\n${selectionList}`;
+                const messageContent = `You have made ${winnersSelected} out of ${fightCard.length} Fight Winner picks.\nYou have made ${methodsSelected} out of ${fightCard.length} Winning Method picks.\n\n${selectionList}`;
     
                 // Send an ephemeral message with the user's selections and pick count
-                if (numberOfSelections > 0) { // This checks if the user made any selections
+                if (winnersSelected > 0 || methodsSelected > 0) { // This checks if the user made any selections
                   interaction.reply({
                       content: messageContent,
                       ephemeral: true,
@@ -354,6 +353,7 @@ async function createPoll(channel, fightCard) {
         }
       }
     }
+
 
     
 
