@@ -325,11 +325,15 @@ async function createPoll(channel, fightCard) {
     
                 console.log('orderedSelections:', orderedSelections);
     
+                // Count the number of fight winners and methods selected
+                const winnersSelected = orderedSelections.filter(selection => selection !== 'No Selection').length;
+                const methodsSelected = orderedSelections.filter(selection => selection.includes(' - ')).length;
+
                 // Create a concise list of selections
                 const selectionList = orderedSelections.join('\n');
     
                 // Create the message content with the number of picks made and the total picks
-                const messageContent = `You have made ${numberOfSelections} out of ${fightCard.length} picks:\n${selectionList}`;
+                const messageContent = `You have made ${numberOfSelections} out of ${fightCard.length} picks.\nWinners selected: ${winnersSelected}\nMethods selected: ${methodsSelected}\n\n${selectionList}`;
     
                 // Send an ephemeral message with the user's selections and pick count
                 if (numberOfSelections > 0) { // This checks if the user made any selections
@@ -350,6 +354,7 @@ async function createPoll(channel, fightCard) {
         }
       }
     }
+
     
 
 
