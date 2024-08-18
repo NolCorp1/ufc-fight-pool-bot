@@ -59,7 +59,7 @@ app.listen(port, () => {
 });
 
 // URL of the Wikipedia page with the table you want to scrape
-const url = 'https://en.wikipedia.org/wiki/UFC_304';
+const url = 'https://en.wikipedia.org/wiki/UFC_305';
 
 // Function to scrape and process the UFC fight card data
 async function scrapeUFCCard() {
@@ -307,7 +307,6 @@ async function createPoll(channel, fightCard) {
             if (interaction.isButton() && interaction.customId === 'viewMyPicks') {
                 const userId = interaction.user.id;
                 const selectedFighters = userSelections;
-                const numberOfSelections = Object.keys(selectedFighters).length;
     
                 // Create an array to hold the selections in the order of the fight card's fight IDs
                 const orderedSelections = fightCard.map((fightInfo) => {
@@ -325,14 +324,18 @@ async function createPoll(channel, fightCard) {
     
                 console.log('orderedSelections:', orderedSelections);
     
+                // Count the number of fight winners and methods selected
+                const winnersSelected = orderedSelections.filter(selection => selection !== 'No Selection').length;
+                const methodsSelected = orderedSelections.filter(selection => selection.includes(' - ') && !selection.includes('No Method')).length;
+
                 // Create a concise list of selections
                 const selectionList = orderedSelections.join('\n');
     
                 // Create the message content with the number of picks made and the total picks
-                const messageContent = `You have made ${numberOfSelections} out of ${fightCard.length} picks:\n${selectionList}`;
+                const messageContent = `**${winnersSelected}** out of **${fightCard.length}** Fight Winners selected.\n**${methodsSelected}** out of **${fightCard.length}** Winning Methods selected.\n\n${selectionList}`;
     
                 // Send an ephemeral message with the user's selections and pick count
-                if (numberOfSelections > 0) { // This checks if the user made any selections
+                if (winnersSelected > 0 || methodsSelected > 0) { // This checks if the user made any selections
                   interaction.reply({
                       content: messageContent,
                       ephemeral: true,
@@ -350,7 +353,51 @@ async function createPoll(channel, fightCard) {
         }
       }
     }
+
+
+// Command to show each user that has made selections and how many fight winner and method selections they have made
+client.on('messageCreate', (message) => {
+  if (message.content.startsWith(`${prefix}whosin`)) {
+    let whosinMessage = '**Fellas who have made selections:**\n';
     
+    // Create an object to store user selection counts
+    const userSelectionCounts = {};
+
+    for (const fightId in userSelections) {
+      for (const userId in userSelections[fightId]) {
+        const userSelection = userSelections[fightId][userId];
+
+        if (!userSelectionCounts[userId]) {
+          userSelectionCounts[userId] = { winners: 0, methods: 0 };
+        }
+
+        if (userSelection.winner) {
+          userSelectionCounts[userId].winners++;
+        }
+        
+        if (userSelection.method) {
+          userSelectionCounts[userId].methods++;
+        }
+      }
+    }
+
+    // Format the user selection counts for output
+    for (const userId in userSelectionCounts) {
+      const { winners, methods } = userSelectionCounts[userId];
+      const user = message.guild.members.cache.get(userId);
+      
+      if (user) {
+        whosinMessage += `${user.displayName}: ${winners} Fight Winner picks, ${methods} Method picks\n`;
+      }
+    }
+
+    if (whosinMessage === '**Fellas who have made selections:**\n') {
+      whosinMessage += 'No selections made yet.';
+    }
+
+    message.channel.send(whosinMessage);
+  }
+});    
 
 
 
