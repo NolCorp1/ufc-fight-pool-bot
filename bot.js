@@ -9,6 +9,8 @@ const cheerio = require('cheerio');
 const express = require('express');
 const { createCanvas, loadImage } = require('canvas');
 const urlShortener = require('node-url-shortener');
+const { supabase } = require('./supabaseClient');
+const { createClient } = require('@supabase/supabase-js');
 
 const { token } = require("./config.json");
 const { prefix } = require("./config.json");
@@ -16,6 +18,16 @@ const app = express();
 const port = process.env.PORT || 3000;
 const googleCseId = '74d3744699a0a4ed8';
 const googleApiKey = 'AIzaSyDkeE0zpcPt-oGrfhOq3Km1LLtcMTqE4GM';
+
+
+// Replace with your Supabase project details
+const SUPABASE_URL = 'https://tnjctugpbfeuuthikzgr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuamN0dWdwYmZldXV0aGlremdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMzMjQsImV4cCI6MjA1Mjk4OTMyNH0.J_8_KdB3E7ibCKEteGPJ23J-BWMgQ-r6vhaup7uBEtw';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+module.exports = { supabase };
+
 
 // Gateway Intents are so bot developers can choose which events their bot receives
 // based on which data it needs to function.
@@ -45,6 +57,76 @@ let fightCard = [];
 const userSelections = {};
 const orderedSelections = {};
 const selectedFighters = {};
+
+async function scrapeUFCEvents() {
+  const url = 'https://en.wikipedia.org/wiki/List_of_UFC_events';
+  const response = await axios.get(url);
+  const $ = cheerio.load(response.data);
+
+  const events = [];
+  $('table.wikitable tr').each((_, row) => {
+      const cols = $(row).find('td');
+      if (cols.length > 0) {
+          const eventName = $(cols[1]).text().trim();
+          const date = $(cols[2]).text().trim();
+
+          // Convert date to YYYY-MM-DD format
+          const formattedDate = new Date(date).toISOString().split('T')[0];
+          events.push({ eventName, date: formattedDate });
+      }
+  });
+
+  // Insert events into the database
+  for (const event of events) {
+      const { data, error } = await supabase
+          .from('events')
+          .upsert({ event_name: event.eventName, event_date: event.date }, { onConflict: 'event_name' });
+
+      if (error) {
+          console.error('Error inserting event:', error.message);
+      } else {
+          console.log(`Event "${event.eventName}" added to database.`);
+      }
+  }
+}
+
+module.exports = { scrapeUFCEvents };
+
+
+const { supabase } = require('./supabaseClient');
+
+async function createFightPools() {
+    const now = new Date();
+    const twelveHoursLater = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
+
+    const { data: events, error } = await supabase
+        .from('events')
+        .select('*')
+        .gte('event_date', now.toISOString().split('T')[0])
+        .lte('event_date', twelveHoursLater.split('T')[0]);
+
+    if (error) {
+        console.error('Error fetching upcoming events:', error.message);
+        return;
+    }
+
+    for (const event of events) {
+        // Send a message in Discord
+        const message = `Would you like to create a fight pool for "${event.event_name}"?`;
+        const channel = // Your logic to identify the Discord channel;
+        const button = // Logic to create a Discord button;
+
+        await channel.send({
+            content: message,
+            components: [button],
+        });
+
+        console.log(`Sent fight pool creation message for event: ${event.event_name}`);
+    }
+}
+
+module.exports = { createFightPools };
+
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -136,6 +218,28 @@ async function fetchFighterImageURL(query, retryCount = 3) {
     }
   }
 }
+
+const { supabase } = require('./supabaseClient');
+
+async function recordPick(userId, serverId, fightId, selectedFighter, method = null) {
+  // Insert or update the user's pick in the Supabase database
+  const { error } = await supabase.from('picks').upsert({
+    user_id: userId,
+    server_id: serverId,
+    fight_id: fightId,
+    selected_fighter: selectedFighter,
+    method,
+  }, { onConflict: ['user_id', 'server_id', 'fight_id'] });
+
+  if (error) {
+    console.error('Error recording pick:', error.message);
+    return 'Failed to record pick.';
+  }
+
+  return 'Pick recorded successfully!';
+}
+
+module.exports = { recordPick };
 
 
 // Function to create fight pool polls
@@ -236,20 +340,21 @@ async function createPoll(channel, fightCard) {
           filter: fighterFilter,
         });
 
-        fighterCollector.on('collect', (interaction) => {
+        fighterCollector.on('collect', async (interaction) => {
           const selectedFighter = interaction.customId;
           const userId = interaction.user.id;
-          const fightid = `${fightInfo.fighter1} vs ${fightInfo.fighter2}`;
-
-          // Store the user's selection for this fight poll
-          userSelections[fightid] = userSelections[fightid] || {};
-          userSelections[fightid][userId] = { winner: selectedFighter };
-
+          const fightId = `${fightInfo.fighter1} vs ${fightInfo.fighter2}`;
+          const serverId = interaction.guild.id;
+        
+          // Save the pick in the database
+          const result = await recordPick(userId, serverId, fightId, selectedFighter);
+        
+          console.log(result); // Log success or failure
+        
           // Acknowledge the user's choice
           interaction.deferUpdate();
-          // Uncomment the next line if you want to send a feedback to the user
-          // interaction.followUp({ content: `You selected ${selectedFighter} as the winner`, ephemeral: true });
         });
+        
 
         fighterCollector.on('end', () => {
           // Disable the buttons when the poll ends (if needed)
@@ -266,21 +371,21 @@ async function createPoll(channel, fightCard) {
           filter: methodFilter,
         });
 
-        methodCollector.on('collect', (interaction) => {
+        methodCollector.on('collect', async (interaction) => {
           const selectedMethod = interaction.customId.split('_')[1];
           const userId = interaction.user.id;
-          const fightid = `${fightInfo.fighter1} vs ${fightInfo.fighter2}`;
-      
-          // Store the user's selection for this fight poll
-          userSelections[fightid] = userSelections[fightid] || {};
-          userSelections[fightid][userId] = userSelections[fightid][userId] || {};
-          userSelections[fightid][userId].method = selectedMethod;
-      
+          const fightId = `${fightInfo.fighter1} vs ${fightInfo.fighter2}`;
+          const serverId = interaction.guild.id;
+        
+          // Save the pick in the database
+          const result = await recordPick(userId, serverId, fightId, null, selectedMethod);
+        
+          console.log(result); // Log success or failure
+        
           // Acknowledge the user's choice
           interaction.deferUpdate();
-          // Uncomment the next line if you want to send a feedback to the user
-          // interaction.followUp({ content: `You selected ${selectedMethod} as the method of victory`, ephemeral: true });
         });
+        
 
         methodCollector.on('end', () => {
           // Disable the buttons when the poll ends (if needed)
@@ -302,52 +407,63 @@ async function createPoll(channel, fightCard) {
     const rulesMessage = '**__Rules__**\n**- Leaderboard goes by number of fight winners picked correctly**\n**- Tiebreaker is determined by amount of \'method of victories\' picked correctly**\n**- Make sure to click \'View My Picks\' button to confirm you made all Fighter and Method selections**';
     channel.send(rulesMessage);
 
-          // Handle the "View My Picks" button interaction
-          client.on('interactionCreate', async (interaction) => {
-            if (interaction.isButton() && interaction.customId === 'viewMyPicks') {
-                const userId = interaction.user.id;
-                const selectedFighters = userSelections;
-    
-                // Create an array to hold the selections in the order of the fight card's fight IDs
-                const orderedSelections = fightCard.map((fightInfo) => {
-                  const fightId = `${fightInfo.fighter1} vs ${fightInfo.fighter2}`;
-                  const userSelection = userSelections[fightId] && userSelections[fightId][userId];
-    
-                  if (userSelection && userSelection.winner && userSelection.method) {
-                    return `${userSelection.winner} - ${userSelection.method}`;
-                  } else if (userSelection && userSelection.winner) {
-                    return `${userSelection.winner} - No Method`;
-                  } else {
-                    return 'No Selection';
-                  }
-                });
-    
-                console.log('orderedSelections:', orderedSelections);
-    
-                // Count the number of fight winners and methods selected
-                const winnersSelected = orderedSelections.filter(selection => selection !== 'No Selection').length;
-                const methodsSelected = orderedSelections.filter(selection => selection.includes(' - ') && !selection.includes('No Method')).length;
+    // Handle the "View My Picks" button interaction
+    client.on('interactionCreate', async (interaction) => {
+      if (interaction.isButton() && interaction.customId === 'viewMyPicks') {
+        const userId = interaction.user.id;
+        const serverId = interaction.guild.id;
 
-                // Create a concise list of selections
-                const selectionList = orderedSelections.join('\n');
-    
-                // Create the message content with the number of picks made and the total picks
-                const messageContent = `**${winnersSelected}** out of **${fightCard.length}** Fight Winners selected.\n**${methodsSelected}** out of **${fightCard.length}** Winning Methods selected.\n\n${selectionList}`;
-    
-                // Send an ephemeral message with the user's selections and pick count
-                if (winnersSelected > 0 || methodsSelected > 0) { // This checks if the user made any selections
-                  interaction.reply({
-                      content: messageContent,
-                      ephemeral: true,
-                  });
-              } else {
-                interaction.reply({
-                  content: 'You have not made any picks yet.',
-                  ephemeral: true,
-                }).catch(console.error);
-              }
-            }
+        // Fetch the user's selections from Supabase
+        const { data: userPicks, error } = await supabase
+          .from('picks')
+          .select('fight_id, selected_fighter, method')
+          .eq('user_id', userId)
+          .eq('server_id', serverId);
+
+        if (error) {
+          console.error('Error fetching picks:', error.message);
+          interaction.reply({ content: 'Failed to fetch your picks.', ephemeral: true });
+          return;
+        }
+
+        // Format the selections for display
+        const orderedSelections = fightCard.map((fightInfo) => {
+          const fightId = `${fightInfo.fighter1} vs ${fightInfo.fighter2}`;
+          const userPick = userPicks.find((pick) => pick.fight_id === fightId);
+
+          if (userPick) {
+            return `${userPick.selected_fighter} - ${userPick.method || 'No Method'}`;
+          } else {
+            return 'No Selection';
+          }
+        });
+
+        console.log('orderedSelections:', orderedSelections);
+
+        // Count the number of fight winners and methods selected
+        const winnersSelected = orderedSelections.filter(selection => selection !== 'No Selection').length;
+        const methodsSelected = orderedSelections.filter(selection => selection.includes(' - ') && !selection.includes('No Method')).length;
+
+        // Create a concise list of selections
+        const selectionList = orderedSelections.join('\n');
+
+        // Create the message content with the number of picks made and the total picks
+        const messageContent = `**${winnersSelected}** out of **${fightCard.length}** Fight Winners selected.\n**${methodsSelected}** out of **${fightCard.length}** Winning Methods selected.\n\n${selectionList}`;
+
+        // Send an ephemeral message with the user's selections and pick count
+        if (winnersSelected > 0 || methodsSelected > 0) { // This checks if the user made any selections
+          interaction.reply({
+            content: messageContent,
+            ephemeral: true,
           });
+        } else {
+          interaction.reply({
+            content: 'You have not made any picks yet.',
+            ephemeral: true,
+          }).catch(console.error);
+        }
+      }
+    });
         } catch (error) {
           console.error('Error:', error);
         }
