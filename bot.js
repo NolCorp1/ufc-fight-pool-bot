@@ -82,9 +82,6 @@ async function scrapeUFCEvents() {
 
 module.exports = { scrapeUFCEvents };
 
-
-const { supabase } = require('./supabaseClient');
-
 async function createFightPools() {
     const now = new Date();
     const twelveHoursLater = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
@@ -209,7 +206,6 @@ async function fetchFighterImageURL(query, retryCount = 3) {
   }
 }
 
-const { supabase } = require('./supabaseClient');
 
 async function recordPick(userId, serverId, fightId, selectedFighter, method = null) {
   // Insert or update the user's pick in the Supabase database
