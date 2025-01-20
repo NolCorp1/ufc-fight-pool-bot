@@ -10,7 +10,6 @@ const express = require('express');
 const { createCanvas, loadImage } = require('canvas');
 const urlShortener = require('node-url-shortener');
 const { supabase } = require('./supabaseClient');
-const { createClient } = require('@supabase/supabase-js');
 
 const { token } = require("./config.json");
 const { prefix } = require("./config.json");
@@ -18,15 +17,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 const googleCseId = '74d3744699a0a4ed8';
 const googleApiKey = 'AIzaSyDkeE0zpcPt-oGrfhOq3Km1LLtcMTqE4GM';
-
-
-// Replace with your Supabase project details
-const SUPABASE_URL = 'https://tnjctugpbfeuuthikzgr.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuamN0dWdwYmZldXV0aGlremdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTMzMjQsImV4cCI6MjA1Mjk4OTMyNH0.J_8_KdB3E7ibCKEteGPJ23J-BWMgQ-r6vhaup7uBEtw';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-module.exports = { supabase };
 
 
 // Gateway Intents are so bot developers can choose which events their bot receives
