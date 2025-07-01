@@ -17,6 +17,9 @@ const port = process.env.PORT || 3000;
 const googleCseId = '74d3744699a0a4ed8';
 const googleApiKey = 'AIzaSyDkeE0zpcPt-oGrfhOq3Km1LLtcMTqE4GM';
 
+require('dotenv').config();
+const token = process.env.DISCORD_TOKEN;
+
 // Gateway Intents are so bot developers can choose which events their bot receives
 // based on which data it needs to function.
 // Partials allow you to receive the full data of the objects returned from each event
