@@ -10,15 +10,14 @@ const express = require('express');
 const { createCanvas, loadImage } = require('canvas');
 const urlShortener = require('node-url-shortener');
 
-const { token } = require("./config.json");
-const { prefix } = require("./config.json");
+require('dotenv').config();
+
+const token = process.env.DISCORD_TOKEN;
+const prefix = process.env.PREFIX;
 const app = express();
 const port = process.env.PORT || 3000;
-const googleCseId = '74d3744699a0a4ed8';
-const googleApiKey = 'AIzaSyDkeE0zpcPt-oGrfhOq3Km1LLtcMTqE4GM';
-
-require('dotenv').config();
-const token = process.env.DISCORD_TOKEN;
+const googleCseId = process.env.GOOGLE_CSE_ID;
+const googleApiKey = process.env.GOOGLE_API_KEY;
 
 // Gateway Intents are so bot developers can choose which events their bot receives
 // based on which data it needs to function.
